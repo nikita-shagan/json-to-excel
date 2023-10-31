@@ -1,130 +1,8 @@
-const excel = require("excel4node");
-const fs = require("fs");
+const XLSX = require("xlsx-js-style")
+const { styles } = require("./styles")
 
-// You can define styles as json object
-const styles = {
-	headerGrey: {
-		fill: {
-			type: "pattern",
-			patternType: "solid",
-			fgColor: "FFDEE6EF",
-		},
-		border: {
-			top: { style: "thin", color: "#404040" },
-			bottom: { style: "thin", color: "#404040" },
-			left: { style: "thin", color: "#404040" },
-			right: { style: "thin", color: "#404040" },
-		},
-		font: {
-			color: "FF000000",
-			name: "Arial",
-			size: 10,
-			bold: true,
-			underline: false,
-		},
-		alignment: {
-			vertical: "top",
-			horizontal: "center",
-		},
-		wrapText: true,
-	},
-	cellNum: {
-		numberFormat: "#,##0",
-		font: { name: "Arial", size: 10 },
-		alignment: {
-			vertical: "top",
-			horizontal: "right",
-		},
-		border: {
-			top: { style: "thin", color: "#404040" },
-			bottom: { style: "thin", color: "#404040" },
-			left: { style: "thin", color: "#404040" },
-			right: { style: "thin", color: "#404040" },
-		},
-	},
-	cellPercent: {
-		numberFormat: "0.0%",
-		font: { name: "Arial", size: 10 },
-		alignment: {
-			vertical: "top",
-			horizontal: "right",
-		},
-		border: {
-			top: { style: "thin", color: "#404040" },
-			bottom: { style: "thin", color: "#404040" },
-			left: { style: "thin", color: "#404040" },
-			right: { style: "thin", color: "#404040" },
-		},
-	},
-	cellCenter: {
-		alignment: {
-			vertical: "top",
-			horizontal: "center",
-		},
-		numberFormat: "0",
-		font: { name: "Arial", size: 10 },
-		border: {
-			top: { style: "thin", color: "#404040" },
-			bottom: { style: "thin", color: "#404040" },
-			left: { style: "thin", color: "#404040" },
-			right: { style: "thin", color: "#404040" },
-		},
-	},
-	cellQuantity: {
-		alignment: {
-			vertical: "top",
-			horizontal: "center",
-		},
-		numberFormat: "0.0##",
-		font: { name: "Arial", size: 10 },
-		border: {
-			top: { style: "thin", color: "#404040" },
-			bottom: { style: "thin", color: "#404040" },
-			left: { style: "thin", color: "#404040" },
-			right: { style: "thin", color: "#404040" },
-		},
-	},
-	cellDate: {
-		alignment: {
-			vertical: "top",
-			horizontal: "center",
-		},
-		numberFormat: "dd.mm.yy",
-		font: { name: "Arial", size: 10 },
-		border: {
-			top: { style: "thin", color: "#404040" },
-			bottom: { style: "thin", color: "#404040" },
-			left: { style: "thin", color: "#404040" },
-			right: { style: "thin", color: "#404040" },
-		},
-	},
-	cellDateTime: {
-		alignment: {
-			vertical: "top",
-			horizontal: "center",
-		},
-		numberFormat: "yyyy-mm-dd hh:mm",
-		font: { name: "Arial", size: 10 },
-		border: {
-			top: { style: "thin", color: "#404040" },
-			bottom: { style: "thin", color: "#404040" },
-			left: { style: "thin", color: "#404040" },
-			right: { style: "thin", color: "#404040" },
-		},
-	},
-	cellDefault: {
-		alignment: {
-			vertical: "top",
-		},
-		font: { name: "Arial", size: 10 },
-		border: {
-			top: { style: "thin", color: "#404040" },
-			bottom: { style: "thin", color: "#404040" },
-			left: { style: "thin", color: "#404040" },
-			right: { style: "thin", color: "#404040" },
-		},
-	},
-};
+const dateRegex = /\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d\.\d+([+-][0-2]\d:[0-5]\d|Z)/
+
 
 function getXLSX(data) {
 	//Array of objects representing heading rows (very top)
@@ -146,128 +24,120 @@ function getXLSX(data) {
 	//     },
 	//   ]);
 	const report = buildExport(data.sheets);
-	if (report) return report.writeToBuffer();
+	if (report) return XLSX.write(report, { type: 'buffer' })
 }
 
-function set_cell({ ws, r1, c1, r2, c2, merged, value, baseStyle, styleFunc, beforeWriteStyle }) {
-	let cell = ws.cell(r1, c1, r2, c2, merged);
-	if (value == null) value = undefined;
-	switch (typeof value) {
-		case "number":
-			cell.number(value);
-			break;
-		case "undefined":
-			cell.string("");
-			break;
-		default:
-			if (typeof value.getMonth === "function") {
-				cell.date(value);
-				break;
-			}
-			cell.string(String(value));
-			break;
-	}
-	if (baseStyle) {
-		cell.style(baseStyle);
-	}
-	if (styleFunc) {
-		cell.style(styleFunc);
-	}
-	if (beforeWriteStyle) {
-		cell.style(beforeWriteStyle); // beforeWrite идет в самом конце
-	}
+
+function getCell({ value, baseStyle, styleFunc, beforeWriteStyle }) {
+  let v = value || '';
+  let t = (typeof value)[0]
+  let s = baseStyle || {}
+  if (styleFunc) {
+    s = {...s, ...styleFunc}
+  }
+  if (beforeWriteStyle) {
+    s = {...s, ...beforeWriteStyle}
+  }
+  if (dateRegex.test(value)) {
+    const date = new Date(value);
+    v = 25569 + ((date.getTime()) / (1000 * 60 * 60 * 24))
+    t = 'n'
+  }
+  return { v, t, s }
 }
 
 function buildExport(sheets) {
-	let workbook = new excel.Workbook();
-	let stylebook = {};
-	Object.keys(styles).forEach(stylename => {
-		let styledef = styles[stylename];
-    stylebook[stylename] = workbook.createStyle(styledef);
-	});
-	sheets.forEach(sheet => {
+  const workbook = XLSX.utils.book_new();
+  sheets.forEach(sheet => {
 		if (!sheet.specification) return;
-		let worksheet = workbook.addWorksheet(sheet.name, {
-			sheetView: { showGridLines: false },
-			sheetFormat: { defaultRowHeight: 12.85 },
-		});
-		let heading = sheet.heading || [];
-		let headrow = heading.length + 1;
-		heading.forEach((r, rn) => {
-			if (r instanceof Array) {
-				r.forEach((val, cn) => {
-					let m = { ws: worksheet, r1: rn + 1, c1: cn + 1 };
-					if (val && typeof val === "object" && val.style) {
-						m.value = val.value;
-						m.style = val.style;
+    let sheetTable = [];
+    let columnsWidths = [];
+    let rowHeights = [];
+
+    // Заполняем заголовок страницы из аттрибута "heading"
+    let heading = sheet.heading || [];
+		heading.forEach((row) => {
+			if (row instanceof Array) {
+        let headingRow = []
+				row.forEach((value) => {
+          const cellData = {}
+					if (value && typeof value === "object") {
+            cellData.value = value.value
+            cellData.baseStyle = value.style
 					} else {
-						m.value = val;
+            cellData.value = value
 					}
-					set_cell(m);
+          const cell = getCell(cellData)
+					headingRow.push(cell)
 				});
+        sheetTable.push(headingRow)
 			}
 		});
-		Object.keys(sheet.specification).forEach((colname, colno) => {
-			let spec = sheet.specification[colname];
-			let cell = worksheet.cell(headrow, colno + 1).string(spec.displayName);
-			if (stylebook[spec.headerStyle]) {
-				cell.style(stylebook[spec.headerStyle]);
-			}
-			if (spec.width) worksheet.column(colno + 1).setWidth(Number(spec.width));
+
+    // Устанавливаем заголовки столбцов
+    const headerRow = []
+    Object.keys(sheet.specification).forEach((colName) => {
+			const spec = sheet.specification[colName];
+			const cell = getCell({
+        value: spec.displayName,
+        baseStyle: styles[spec.headerStyle]
+      });
+			if (spec.width) columnsWidths.push({wch: Math.floor(Number(spec.width) * 1.1)});
+      headerRow.push(cell)
 		});
-		let merges = {}; // объединить ячейки в excel4node можно только 1 раз, поэтому будем копить объединения тут
-		// в привязке к верхней левой ячейке
-		sheet.data.forEach((row, rowno) => {
-			row._row_number = rowno + 1;
-			Object.keys(sheet.specification).forEach((colname, colno) => {
-				let value = row[colname];
-				let spec = sheet.specification[colname];
-				let res = {};
+    sheetTable.push(headerRow)
+
+    // Заполняем таблицу данными из аттрибута "data"
+    const merges = []
+    const headingsHeight = sheetTable.length
+    let rowStart = sheetTable.length
+    sheet.data.forEach((row, rowNum) => {
+      let rowData = []
+      rowHeights.push({hpt: 12.85})
+      Object.keys(sheet.specification).forEach((colName) => {
+        let value = row[colName];
+        const spec = sheet.specification[colName]
+				const styleName = spec.cellStyle
+        const baseStyle = styleName && styles[styleName] || styles.cellDefault
+        let res = {};
 				let sf;
-				if (spec.styleFunc && typeof spec.styleFunc === "function") {
+        if (spec.styleFunc && typeof spec.styleFunc === "function") {
 					sf = spec.styleFunc(value, row);
 				}
 				if (spec.beforeWrite && typeof spec.beforeWrite === "function") {
 					res = spec.beforeWrite(value, {
 						dataset: sheet.data,
 						row,
-						rowno,
-						colname,
+						rowNum,
+						colName,
 					});
 					value = res.newvalue;
+          if (res.allSame === false) {
+            res.fields.forEach((field, index) => {
+              merges.push({
+                s: { r: rowStart, c: index },
+                e: { r: rowNum + headingsHeight - 1, c: index }
+              })
+            })
+            rowStart = rowNum + headingsHeight
+          }
 				}
-				let m = {
-					ws: worksheet,
-					value,
-					baseStyle: stylebook[spec.cellStyle],
-					styleFunc: sf,
-					beforeWriteStyle: res.style,
-				};
-				if (res.merges) {
-					// если есть объединения, то откладываем на потом
-					m.r1 = headrow + rowno + 1 - res.merges.up;
-					m.c1 = colno + 1 - res.merges.left;
-					m.r2 = headrow + rowno + 1;
-					m.c2 = colno + 1;
-					m.merged = true;
-					merges["R" + m.r1 + "C" + m.c1] = m;
-				} else {
-					m.r1 = headrow + rowno + 1;
-					m.c1 = colno + 1;
-					set_cell(m);
-				}
-			});
-		});
-		// закончили все строчки, теперь надо пройтись по объединенным ячейкам
-		// если объединения постепенно расширялись, то более поздние затирали более ранние
-		// никакой проверки мы не проводим, кроме того, что объединения можно возвращать только влево и вверх из
-		// beforeWrite
-		Object.keys(merges).forEach(topLeftCell => {
-			let m = merges[topLeftCell];
-			set_cell(m);
-		});
-		worksheet.row(headrow).freeze();
-	});
+        const cell = getCell({ value, baseStyle, styleFunc: sf, beforeWriteStyle: res.style})
+        rowData.push(cell)
+      })
+      sheetTable.push(rowData)
+      rowData = []
+    })
+
+    // Создаем и форматируем страницу
+    const worksheet = XLSX.utils.aoa_to_sheet(sheetTable);
+    worksheet['!cols'] = columnsWidths;
+    worksheet['!rows'] = rowHeights;
+    worksheet['!merges'] = merges;
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheet.name);
+    sheetTable = []
+  })
+
 	return workbook;
 }
 
