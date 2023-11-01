@@ -9,61 +9,68 @@ async function test() {
 	const fields = ["supplier_id", "supplier", "shops", "shops2", "selling_arts1", "revenue1", "sow1", "modified_at"];
 
 	reportbuilder.styles.cellMoney = {
-		numberFormat: "0",
-		font: { name: "Arial", sz: 10 },
+		numberFormat: "#,##0.00",
+		font: { name: "Arial", size: 10 },
 		alignment: {
 			vertical: "top",
 			horizontal: "right",
 		},
 		border: {
-			top: { style: "thin", color: {rgb: "404040"} },
-			bottom: { style: "thin", color: {rgb: "404040"} },
-			left: { style: "thin", color: {rgb: "404040"} },
-			right: { style: "thin", color: {rgb: "404040"} },
+			top: { style: "thin", color: "#404040" },
+			bottom: { style: "thin", color: "#404040" },
+			left: { style: "thin", color: "#404040" },
+			right: { style: "thin", color: "#404040" },
 		},
 	};
 
-	const beforeWrite = function (value, { dataset, row, rowNum, colName }) {
+	const beforeWrite = function (value, { dataset, row, rowno, colname }) {
+		if (colname === "modified_at" && value) {
+			value = new Date(value);
+		}
 		let nextstyle = {
 			fill: {
+				type: "pattern",
 				patternType: "solid",
-				fgColor: {rgb: "d9d9d9"},
+				fgColor: "#d9d9d9",
 			},
 		};
 		let style = {
 			fill: {
+				type: "pattern",
 				patternType: "solid",
-				fgColor: {rgb: "ffffff"},
+				fgColor: "#FFFFFF",
 			},
 		};
 		let important_color = {
 			fill: {
+				type: "pattern",
 				patternType: "solid",
-				fgColor: {rgb: "d9d9d9"},
+				fgColor: "#d9d9d9",
 			},
-			font: { color: {rgb: "ff0000"}, bold: true },
+			font: { color: "#FF0000", style: "bold" },
 		};
 		let important_white = {
 			fill: {
+				type: "pattern",
 				patternType: "solid",
-				fgColor: {rgb: "ffffff"},
+				fgColor: "#FFFFFF",
 			},
-			font: { color: {rgb: "ff0000"}, bold: true },
+			font: { color: "#FF0000", style: "bold" },
 		};
 
-		let curr = storage[rowNum];
+		let curr = storage[rowno];
 		let important_row;
 		if (curr && curr.row && !curr.row.selling_arts1 && curr.row.shops2 > 3) important_row = true;
 		let currstyle;
 		if (curr) {
 			currstyle = important_row
-				? curr.style.fill.fgColor.rgb === "ffffff"
+				? curr.style.fill.fgColor == "#FFFFFF"
 					? important_white
 					: important_color
 				: curr.style;
 		}
 		if (curr && curr.repeat) {
-			if (fields.includes(colName)) {
+			if (fields.includes(colname)) {
 				return { newvalue: value, style: currstyle, merges: { left: 0, up: curr.repeat } };
 			} else {
 				return { newvalue: value, style: currstyle };
@@ -71,17 +78,17 @@ async function test() {
 		}
 		if (curr && curr.repeat === 0) return { newvalue: value, style: currstyle };
 		// если мы тут, значит это колонка А, начало строки
-		storage[rowNum] = curr || { row, repeat: 0 };
-		curr = storage[rowNum];
+		storage[rowno] = curr || { row, repeat: 0 };
+		curr = storage[rowno];
 		// заново определяем, важная ли это строка
 		if (curr && curr.row && !curr.row.selling_arts1 && curr.row.shops2 > 3) important_row = true;
-		let prevno = rowNum - 1;
+		let prevno = rowno - 1;
 		if (!(prevno in storage)) {
 			curr.repeat = 0;
 			curr.style = style;
 			curr.nextstyle = nextstyle;
 			currstyle = important_row
-				? curr.style.fill.fgColor.rgb === "ffffff"
+				? curr.style.fill.fgColor == "#FFFFFF"
 					? important_white
 					: important_color
 				: curr.style;
@@ -114,11 +121,11 @@ async function test() {
 			curr.style = prev.style;
 			curr.nextstyle = prev.nextstyle;
 			currstyle = important_row
-				? curr.style.fill.fgColor.rgb === "ffffff"
+				? curr.style.fill.fgColor == "#FFFFFF"
 					? important_white
 					: important_color
 				: curr.style;
-			if (fields.includes(colName)) {
+			if (fields.includes(colname)) {
 				return { newvalue: value, style: currstyle, merges: { left: 0, up: curr.repeat } };
 			} else {
 				return { newvalue: value, style: currstyle };
@@ -128,11 +135,11 @@ async function test() {
 		curr.nextstyle = prev.style;
 		curr.repeat = 0;
 		currstyle = important_row
-			? curr.style.fill.fgColor.rgb === "ffffff"
+			? curr.style.fill.fgColor == "#FFFFFF"
 				? important_white
 				: important_color
 			: curr.style;
-		return { newvalue: value, style: currstyle, fields, allSame: all_same };
+		return { newvalue: value, style: currstyle };
 	};
 
 	let spec = {
@@ -241,8 +248,9 @@ async function test() {
 				if (row && value > row.maxprice)
 					return {
 						fill: {
+							type: "pattern",
 							patternType: "solid",
-							fgColor: {rgb: "ffc773"},
+							fgColor: "#ffc773",
 						},
 					};
 			},
