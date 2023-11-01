@@ -9,7 +9,7 @@ This script allows to make Excel file from json document
 npm install
 ```
 
-#### Run xlsxReportBuilder.js to see how it works:
+#### Run xlsxReportBuilder.test.js to see how it works:
 
 ```
 node xlsxReportBuilder.test.js
